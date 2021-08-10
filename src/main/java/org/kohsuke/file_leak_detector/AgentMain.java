@@ -21,9 +21,11 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketImpl;
 import java.nio.channels.FileChannel;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.nio.channels.spi.AbstractSelectableChannel;
 import java.nio.channels.spi.AbstractSelector;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -52,10 +54,10 @@ public class AgentMain {
     public static void agentmain(String agentArguments, Instrumentation instrumentation) throws Exception {
         premain(agentArguments,instrumentation);
     }
-    
+
     public static void premain(String agentArguments, Instrumentation instrumentation) throws Exception {
         int serverPort = -1;
-        
+
         if(agentArguments!=null) {
             // used by Main to prevent the termination of target JVM
             boolean quit = true;
@@ -133,8 +135,8 @@ public class AgentMain {
 
         Listener.AGENT_INSTALLED = true;
         instrumentation.addTransformer(new TransformerImpl(createSpec()),true);
-        
-        instrumentation.retransformClasses(
+
+        List<Class> classes = Arrays.asList(new Class[] {
                 FileInputStream.class,
                 FileOutputStream.class,
                 RandomAccessFile.class,
@@ -143,8 +145,13 @@ public class AgentMain {
                 AbstractSelectableChannel.class,
                 AbstractInterruptibleChannel.class,
                 FileChannel.class,
-                AbstractSelector.class
-                );
+                AbstractSelector.class,
+                Files.class});
+
+        addIfFound(classes, "sun/nio/ch/SocketChannelImpl");
+        addIfFound(classes, "java/net/AbstractPlainSocketImpl");
+
+        instrumentation.retransformClasses(classes.toArray(new Class[0]));
 
 
 //                Socket.class,
@@ -154,6 +161,14 @@ public class AgentMain {
 
         if (serverPort>=0)
             runHttpServer(serverPort);
+    }
+
+    private static void addIfFound(List<Class> classes, String className) {
+        try {
+            classes.add(Class.forName(className));
+        } catch(ClassNotFoundException e) {
+            // ignored here
+        }
     }
 
     private static void runHttpServer(int port) throws IOException {
@@ -228,6 +243,12 @@ public class AgentMain {
                     new ReturnFromStaticMethodInterceptor("open",
                             "(Ljava/nio/file/Path;Ljava/util/Set;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/channels/FileChannel;", 4, "open_filechannel", FileChannel.class, Path.class)),
             /*
+            SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
+             */
+            new ClassTransformSpec(Files.class,
+                    new ReturnFromStaticMethodInterceptor("newByteChannel",
+                            "(Ljava/nio/file/Path;Ljava/util/Set;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/channels/SeekableByteChannel;", 4, "open_filechannel", SeekableByteChannel.class, Path.class)),
+            /*
              * Detect new Pipes
              */
             new ClassTransformSpec(AbstractSelectableChannel.class,
@@ -249,7 +270,7 @@ public class AgentMain {
                 java.net.Socket/ServerSocket uses SocketImpl, and this is where FileDescriptors
                 are actually managed.
 
-                SocketInputStream/SocketOutputStream does not maintain a separate FileDescritor.
+                SocketInputStream/SocketOutputStream does not maintain a separate FileDescriptor.
                 They just all piggy back on the same SocketImpl instance.
              */
             new ClassTransformSpec("java/net/PlainSocketImpl",
@@ -353,6 +374,7 @@ public class AgentMain {
     /**
      * Used to intercept {@link java.net.PlainSocketImpl#accept(SocketImpl)}
      */
+    @SuppressWarnings("JavadocReference")
     private static class AcceptInterceptor extends MethodAppender {
         public AcceptInterceptor(String name, String desc) {
             super(name,desc);
@@ -398,7 +420,7 @@ public class AgentMain {
          * Decide if this is the method that needs interception.
          */
         protected abstract boolean toIntercept(String owner, String name);
-        
+
         protected Class<? extends Exception> getExpectedException() {
             return IOException.class;
         }
@@ -407,7 +429,7 @@ public class AgentMain {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             if(toIntercept(owner,name)) {
                 Type exceptionType = Type.getType(getExpectedException());
-                
+
                 CodeGenerator g = new CodeGenerator(mv);
                 Label s = new Label(); // start of the try block
                 Label e = new Label();  // end of the try block
