@@ -28,6 +28,14 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <executions>
         <execution>
@@ -108,14 +116,6 @@
         <configuration>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
 
@@ -184,35 +184,4 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-
-
-  <repositories>
-    <repository>
-      <id>Yahoo</id>
-      <url>http://ymaven.corp.yahoo.com:9999/proximity/repository/public</url>
-    </repository>
-    <repository>
-      <id>Yahoo-Edge-Artifactory</id>
-      <url>http://edge.artifactory.yahoo.com:8000/artifactory/maven-local-release</url>
-    </repository>
-    <repository>
-      <id>sherpa-releases</id>
-      <name>sherpa-releases</name>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <url>https://artifactory.ouroath.com/artifactory/Sherpa-java</url>
-      <layout>default</layout>
-    </repository>
-  </repositories>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <id>central</id>
-      <url>http://ymaven.corp.yahoo.com:9999/proximity/repository/public</url>
-    </pluginRepository>
-  </pluginRepositories>
 </project>
